@@ -24,24 +24,22 @@ static const char serverIndex[] PROGMEM =
          <input type='file' accept='.bin,.bin.gz' name='firmware'>
          <input type='submit' value='Update Firmware'>
      </form>
-     <form method='POST' action='' enctype='multipart/form-data'>
-         FileSystem:<br>
-         <input type='file' accept='.bin,.bin.gz' name='filesystem'>
-         <input type='submit' value='Update FileSystem'>
-     </form>
      </body>
      </html>)";
 static const char successResponse[] PROGMEM = 
   "<META http-equiv=\"refresh\" content=\"15;URL=/\">Update Success! Rebooting...";
 
 template <typename ServerType>
-ESP8266HTTPUpdateServerTemplate<ServerType>::ESP8266HTTPUpdateServerTemplate(bool serial_debug)
+ESP8266HTTPUpdateServerTemplate<ServerType>::ESP8266HTTPUpdateServerTemplate(bool serial_debug, ProgressCallback progress_callback, ErrorCallback error_callback, void* callback_context)
 {
   _serial_output = serial_debug;
   _server = NULL;
   _username = emptyString;
   _password = emptyString;
   _authenticated = false;
+  _progress_callback = progress_callback;
+  _error_callback = error_callback;
+  _callback_context = callback_context;
 }
 
 template <typename ServerType>
@@ -104,7 +102,9 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
           }
         }
       } else if(_authenticated && upload.status == UPLOAD_FILE_WRITE && !_updaterError.length()){
-        if (_serial_output) Serial.printf(".");
+        if(_progress_callback) {
+          _progress_callback(_callback_context, (upload.totalSize * 100) / upload.contentLength);
+        }
         if(Update.write(upload.buf, upload.currentSize) != upload.currentSize){
           _setUpdaterError();
         }
@@ -118,6 +118,9 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::setup(ESP8266WebServerTemplate
       } else if(_authenticated && upload.status == UPLOAD_FILE_ABORTED){
         Update.end();
         if (_serial_output) Serial.println("Update was aborted");
+        if(_error_callback) {
+          _error_callback(_callback_context, "Update was aborted");
+        }
       }
       delay(0);
     });
@@ -130,6 +133,9 @@ void ESP8266HTTPUpdateServerTemplate<ServerType>::_setUpdaterError()
   StreamString str;
   Update.printError(str);
   _updaterError = str.c_str();
+  if(_error_callback) {
+    _error_callback(_callback_context, str.c_str());
+  }
 }
 
 };
