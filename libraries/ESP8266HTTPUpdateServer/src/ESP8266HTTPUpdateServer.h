@@ -10,7 +10,11 @@ template <typename ServerType>
 class ESP8266HTTPUpdateServerTemplate
 {
   public:
-    ESP8266HTTPUpdateServerTemplate(bool serial_debug=false);
+
+  using ProgressCallback = void(*)(void*, uint32_t);
+  using ErrorCallback = void(*)(void*, const char*);
+
+    ESP8266HTTPUpdateServerTemplate(bool serial_debug=false, ProgressCallback progress_callback = nullptr, ErrorCallback = nullptr, void* callback_context = nullptr);
 
     void setup(ESP8266WebServerTemplate<ServerType> *server)
     {
@@ -35,6 +39,10 @@ class ESP8266HTTPUpdateServerTemplate
       _password = password;
     }
 
+    void setProgressCallback(ProgressCallback callback) {
+      _progress_callback = callback;
+    }
+
   protected:
     void _setUpdaterError();
 
@@ -45,6 +53,9 @@ class ESP8266HTTPUpdateServerTemplate
     String _password;
     bool _authenticated;
     String _updaterError;
+    ProgressCallback _progress_callback;
+    ErrorCallback _error_callback;
+    void* _callback_context;
 };
 
 };
